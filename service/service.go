@@ -2,8 +2,9 @@ package service
 
 import (
 	"fmt"
-	"github.com/c12s/blackhole/db"
+	"github.com/c12s/blackhole/model"
 	pb "github.com/c12s/blackhole/pb"
+	"github.com/c12s/blackhole/storage"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"log"
@@ -11,7 +12,7 @@ import (
 )
 
 type Server struct {
-	db db.DB
+	Queue *model.BlackHole
 }
 
 func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
@@ -22,7 +23,7 @@ func (s *Server) Get(ctx context.Context, req *pb.GetReq) (*pb.Resp, error) {
 	return nil, nil
 }
 
-func Run(storage db.DB, address string) {
+func Run(db *storage.DB, address string, opts ...*model.TaskQueue) {
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("failed to initializa TCP listen: %v", err)
@@ -31,7 +32,7 @@ func Run(storage db.DB, address string) {
 
 	server := grpc.NewServer()
 	blackholeServer := &Server{
-		db: storage,
+		Queue: model.New(db, opts),
 	}
 
 	fmt.Println("BlackHoleService RPC Started")
