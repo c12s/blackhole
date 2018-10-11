@@ -43,7 +43,7 @@ func newBucket(capacity, tokens int, fillInterval time.Duration) *TokenBucket {
 	}
 }
 
-func New(ctx context.Context, db storage.DB, options ...*model.TaskOption) *BlackHole {
+func New(ctx context.Context, db storage.DB, options []*model.TaskOption) *BlackHole {
 	q := map[string]*TaskQueue{}
 	for _, opt := range options {
 		tb := newBucket(opt.Capacity, opt.Tokens, opt.FillInterval)

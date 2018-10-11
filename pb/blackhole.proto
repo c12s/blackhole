@@ -60,3 +60,7 @@ message GetReq {
 message Resp {
         string msg = 1;
 }
+
+message Task {
+        string id = 1;
+}
