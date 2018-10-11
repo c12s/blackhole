@@ -6,7 +6,7 @@ import (
 
 type TaskOption struct {
 	Name         string
-	NaxWorkers   int
+	MaxWorkers   int
 	MaxQueued    int
 	Capacity     int
 	Tokens       int
