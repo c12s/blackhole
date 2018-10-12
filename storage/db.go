@@ -6,7 +6,14 @@ import (
 )
 
 type DB interface {
-	Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error)
-	Get(ctx context.Context, req *pb.GetReq) (*pb.Resp, error)
-	Take(ctx context.Context, tokens int) ([]*pb.Task, error)
+	// Put tasks in the queue (user submit). Take n tasks from queue (done by workers)
+	PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error)
+	TakeTasks(ctx context.Context, name, user_id string, tokens int) (map[string]*pb.Task, error)
+
+	// Add and Remove queues
+	AddQueue(ctx context.Context, name, user_id string) error
+	RemoveQueue(ctx context.Context, name, user_id string) error
+
+	// Close connection to the persistent storage
+	Close()
 }

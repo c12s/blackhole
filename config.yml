@@ -1,6 +1,7 @@
 blackhole:
   address: localhost:8081
-  db: localhost:7373
+  db:
+    - localhost:7373
   queue:
     myqueue1:
       max_workers: 4 # max number of warkers to spawn

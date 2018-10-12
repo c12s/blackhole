@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"github.com/c12s/blackhole/model"
 	storage "github.com/c12s/blackhole/storage"
 	"time"
@@ -23,6 +24,13 @@ type TaskQueue struct {
 
 type BlackHole struct {
 	Queues map[string]*TaskQueue
+}
+
+func (bh *BlackHole) GetTK(name string) (*TaskQueue, error) {
+	if tk, ok := bh.Queue[name]; ok {
+		return tk, nil
+	}
+	return nil, errors.New("Queue dont exists!")
 }
 
 func newQueue(bucket *TokenBucket, maxQueued, maxWorkers int, db storage.DB) *TaskQueue {

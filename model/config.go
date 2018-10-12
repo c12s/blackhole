@@ -12,7 +12,7 @@ type Config struct {
 
 type BlackHole struct {
 	Address string           `yaml:"address"`
-	DB      string           `yaml:"db"`
+	DB      []string         `yaml:"db"`
 	Queues  map[string]Queue `yaml:"queue"`
 }
 
@@ -30,7 +30,7 @@ type Queue struct {
 
 type BlackHoleConfig struct {
 	Address string
-	DB      string
+	DB      []string
 	Opts    []*TaskOption
 }
 
