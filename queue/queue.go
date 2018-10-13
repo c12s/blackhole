@@ -4,6 +4,7 @@ import (
 	"context"
 	pb "github.com/c12s/blackhole/pb"
 	"log"
+	"math"
 	"time"
 )
 
@@ -40,33 +41,51 @@ func (b *TokenBucket) TakeAll() (bool, int) {
 	return false, 0
 }
 
-func (t *TaskQueue) worker(ctx context.Context, killOnDone bool) chan *pb.Task {
-	ch := make(chan *pb.Task)
+func (t *TaskQueue) newWorker(ctx context.Context, killOnDone bool) *Worker {
+	jobs := make(chan *pb.Task)
+	kill := make(chan bool)
+	done := make(chan bool)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				log.Print(ctx.Err())
 				return
-			case <-ch: //TODO: Do something with the task
+			case <-jobs: //TODO: Do something with the task
 				log.Print("Do something")
+
+				if killOnDone {
+					return
+				}
+				done <- true
+			case <-kill:
 				return
 			}
 		}
 	}()
-	return ch
+
+	return &Worker{
+		Kill: kill,
+		Jobs: jobs,
+		Done: done,
+	}
 }
 
 func (t *TaskQueue) spawn(ctx context.Context, tokens int) bool {
-	tasks, err := t.Queue.Take(ctx, tokens)
+	tasks, err := t.Queue.TakeTasks(ctx, tokens)
 	if err != nil {
 		return false
 	}
 
-	// TODO: Check how mush workers user want to spawn, and than spawn them!!!
-	for _, v := range tasks {
-		ch := t.worker(ctx, false)
-		ch <- v
+	if tokens <= t.MaxWorkers {
+		miss := math.Abs(len(t.WorkerPool) - tokens)
+		for i := 0; i < miss; i++ {
+			t.newWorker(ctx, true)
+		}
+	}
+
+	for i, v := range tasks {
+		t.WoorkerPool[i] <- ch
 	}
 	return true
 }
@@ -91,4 +110,8 @@ func (t *TaskQueue) Loop(ctx context.Context) {
 func (t *TaskQueue) StartQueue(ctx context.Context) {
 	t.Bucket.Start(ctx)
 	t.Loop(ctx)
+}
+
+func (t *TaskQueue) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
+	return t.Queue.PutTasks(ctx, req)
 }
