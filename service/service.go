@@ -1,9 +1,11 @@
 package service
 
 import (
+	"context"
 	"fmt"
-	"github.com/c12s/blackhole/db"
 	pb "github.com/c12s/blackhole/pb"
+	"github.com/c12s/blackhole/queue"
+	"github.com/c12s/blackhole/storage"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"log"
@@ -11,18 +13,43 @@ import (
 )
 
 type Server struct {
-	db db.DB
+	Queue *queue.BlackHole
+}
+
+func (s *Server) getTK(ctx context.Context, req *req.PutReq) (*queue.TaskQueue, error) {
+	if req.ForceNSQueue {
+		tk, err := s.Queue.GetTK(req.Mtdata.Namespace)
+		if err != nil {
+			return nil, err
+		}
+		return tk, nil
+	}
+	tk, err := s.Queue.GetTK(req.Mtdata.TaskName)
+	if err != nil {
+		return nil, err
+	}
+	return rk, nil
 }
 
 func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
-	return nil, nil
+	tk, err := s.getTK(ctx, teq)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		// Call celestial api and put into DB and set status as Waiting or something
+	}()
+
+	go func() {
+		// Put into queue and wait for run time. after job is done, update celestial entry as Running or something
+	}()
+
+	// return to client that task is accepted!
+	return &pb.Resp{Msg: "Accepted"}, nil
 }
 
-func (s *Server) Get(ctx context.Context, req *pb.GetReq) (*pb.Resp, error) {
-	return nil, nil
-}
-
-func Run(storage db.DB, address string) {
+func Run(ctx context.Context, db storage.DB, address string) {
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("failed to initializa TCP listen: %v", err)
@@ -31,7 +58,7 @@ func Run(storage db.DB, address string) {
 
 	server := grpc.NewServer()
 	blackholeServer := &Server{
-		db: storage,
+		Queue: queue.New(ctx, db, opts),
 	}
 
 	fmt.Println("BlackHoleService RPC Started")

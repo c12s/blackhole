@@ -1,0 +1,21 @@
+blackhole:
+  address: localhost:8081
+  db:
+    - localhost:7373
+  queue:
+    myqueue1:
+      max_workers: 4 # max number of warkers to spawn
+      capacity: 4 # capacity of token bucket, when full burst
+      tokens: 0 # number of tokens to start
+      fill_interval: # fill interval per time unit ex: 2/s two tokens added in one second
+        interval: 2
+        rate: s # [s/second | ms/milisecond | m/minute | h/hour]
+    myqueue2:
+      max_workers: 5
+      capacity: 5
+      tokens: 0
+      fill_interval:
+        interval: 2
+        rate: ms # [s/second | ms/milisecond | m/minute | h/hour]
+
+# when config file is loaded, n+1 queues will be created (+1 is a default)
