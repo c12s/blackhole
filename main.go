@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/c12s/blackhole/model"
-	// "github.com/c12s/blackhole/service"
+	"github.com/c12s/blackhole/service"
+	"github.com/c12s/blackhole/storage/etcd"
+	"time"
 )
 
 func main() {
@@ -12,9 +15,15 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(conf)
-	for _, q := range conf.Opts {
-		fmt.Println(q)
+
+	requestTimeout := 10 * time.Second
+	db, dbErr := etcd.New(conf.DB, requestTimeout)
+	if dbErr != nil {
+		fmt.Println(dbErr)
+		return
 	}
-	// service.Run(nil, "localhost:8081")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	service.Run(ctx, db, conf.Address, conf.Opts)
+	cancel()
 }

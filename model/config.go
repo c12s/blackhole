@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+var retry = [...]string{"linear", "exp"}
+
 type Config struct {
 	Content BlackHole `yaml:"blackhole"`
 }
@@ -21,11 +23,18 @@ type FillInterval struct {
 	Rate     string `yaml:"rate"`
 }
 
+type Retry struct {
+	Delay    string `yaml:"delay"`
+	Doubling int    `yaml:"doubling"`
+	Limit    int    `yaml:"limit"`
+}
+
 type Queue struct {
-	MaxWorkers int          `yaml:"max_workers"`
-	Capacity   int          `yaml:"capacity"`
-	Tokens     int          `yaml:"tokens"`
-	Rate       FillInterval `yaml:"fill_interval"`
+	TRetry     Retry        `yaml:"retry"`
+	MaxWorkers int          `yaml:"maxWorkers"`
+	Capacity   int64        `yaml:"capacity"`
+	Tokens     int64        `yaml:"tokens"`
+	Rate       FillInterval `yaml:"fillInterval"`
 }
 
 type BlackHoleConfig struct {
@@ -35,15 +44,16 @@ type BlackHoleConfig struct {
 }
 
 type TaskOption struct {
-	Name         string
-	MaxWorkers   int
-	MaxQueued    int
-	Capacity     int
-	Tokens       int
-	FillInterval time.Duration
+	TRetry     *Retry
+	Name       string
+	MaxWorkers int
+	MaxQueued  int
+	Capacity   int64
+	Tokens     int64
+	FillRate   *FillInterval
 }
 
-func determineInterval(ft *FillInterval) time.Duration {
+func DetermineInterval(ft *FillInterval) time.Duration {
 	if ft.Interval <= 0 { //TODO: for now, this should be implemented beter!!!!
 		return time.Second
 	}
@@ -61,31 +71,52 @@ func determineInterval(ft *FillInterval) time.Duration {
 	}
 }
 
+func checkRetry(strategy string) string {
+	for _, value := range retry {
+		if strategy == value {
+			return strategy
+		}
+	}
+	return "linear" //TODO: This should be checked nad return some error
+}
+
 func configToOption(bcf *Config) *BlackHoleConfig {
 	opts := []*TaskOption{}
 	for name, q := range bcf.Content.Queues {
 		to := &TaskOption{
-			Name:         name,
-			MaxWorkers:   q.MaxWorkers,
-			MaxQueued:    q.MaxWorkers,
-			Capacity:     q.Capacity,
-			Tokens:       q.Tokens,
-			FillInterval: determineInterval(&q.Rate),
+			TRetry:     &q.TRetry,
+			Name:       name,
+			MaxWorkers: q.MaxWorkers,
+			MaxQueued:  q.MaxWorkers,
+			Capacity:   q.Capacity,
+			Tokens:     q.Tokens,
+			FillRate:   &q.Rate,
 		}
 		opts = append(opts, to)
 	}
 
+	tretry := &Retry{
+		Delay:    "linear",
+		Doubling: 1,
+		Limit:    5,
+	}
+
+	fr := &FillInterval{
+		Interval: 1,
+		Rate:     "s",
+	}
+
 	// add defaiult queue
 	dtk := &TaskOption{
-		Name:         "default",
-		MaxWorkers:   5,
-		MaxQueued:    5,
-		Capacity:     5,
-		Tokens:       0,
-		FillInterval: time.Second,
+		TRetry:     tretry,
+		Name:       "default",
+		MaxWorkers: 5,
+		MaxQueued:  5,
+		Capacity:   5,
+		Tokens:     0,
+		FillRate:   fr,
 	}
 	opts = append(opts, dtk)
-
 	return &BlackHoleConfig{
 		Address: bcf.Content.Address,
 		DB:      bcf.Content.DB,
