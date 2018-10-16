@@ -51,6 +51,10 @@ func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, token
 		return nil, err
 	}
 
+	if len(gresp.Kvs) == 0 {
+		return retTasks, nil
+	}
+
 	dresp, err2 := s.Kv.Delete(ctx, key, opts...)
 	if err2 != nil {
 		return nil, err2

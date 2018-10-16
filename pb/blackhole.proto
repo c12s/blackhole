@@ -8,10 +8,45 @@ service BlackHoleService{
         rpc Put(PutReq) returns(Resp){}
 }
 
+
+// Enums
+enum TaskKind {
+    CONFIGS = 0;
+    ACTIONS = 1;
+    SECRETS = 2;
+    NAMESPACES = 3;
+    // TOPOLOGY = 4;
+    // JOB = 5;
+}
+
+enum PayloadKind {
+    FILE = 0;
+    ENV = 1;
+    ACTION = 2;
+}
+
+enum StrategyKind {
+    AT_ONCE = 0;
+    ROLLING_UPDATE = 1;
+}
+
+enum CompareKind {
+    ALL = 0;
+    ANY = 1;
+}
+
+enum TaskStatus {
+    Waiting = 0;
+    Working = 1;
+    Done = 2;
+    // Running = 3;
+}
+
+
 // Request helper messages
 message Strategy {
         string type = 1;
-        string kind = 2;
+        StrategyKind kind = 2;
 }
 
 message KV {
@@ -20,12 +55,12 @@ message KV {
 }
 
 message Selector {
-        string cmp_kind = 1;
+        CompareKind kind = 1;
         repeated KV labels = 2;
 }
 
 message Data {
-        string kind = 1;
+        PayloadKind kind = 1;
         repeated string value = 2;
 }
 
@@ -50,7 +85,7 @@ message PutTask {
 message PutReq {
         string version = 1;
         string user_id = 2;
-        string kind = 3;
+        TaskKind kind = 3;
 
         Metadata mtdata = 4;
         repeated PutTask tasks = 5;
@@ -58,10 +93,11 @@ message PutReq {
 
 message Task {
         string user_id = 1;
-        string kind = 2;
+        TaskKind kind = 2;
         int64 timestamp = 3;
         string namespace = 4;
         PutTask task = 5;
+        TaskStatus status = 6;
 }
 
 
