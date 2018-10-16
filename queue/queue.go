@@ -2,21 +2,36 @@ package queue
 
 import (
 	"context"
+	"github.com/c12s/blackhole/model"
 	pb "github.com/c12s/blackhole/pb"
 	"log"
 	"math"
 	"time"
 )
 
+func (b *TokenBucket) retry() time.Duration {
+	switch b.TRetry.Delay {
+	case "linear":
+		lVal := b.Attempt * b.TRetry.Doubling
+		return time.Duration(lVal) * model.DetermineInterval(b.FillInterval)
+	case "exp":
+		exVal := math.Pow(float64(b.TRetry.Doubling), float64(b.Attempt))
+		return time.Duration(exVal) * model.DetermineInterval(b.FillInterval)
+	default:
+		return time.Second
+	}
+}
+
 func (b *TokenBucket) Start(ctx context.Context) {
 	//every fillTime we try to add new token to the bucket (execute the task)
-	go func(bucket *TokenBucket) {
-		ticker := time.NewTicker(b.FillInterval)
+	go func() {
+		interval := model.DetermineInterval(b.FillInterval)
+		ticker := time.NewTicker(interval)
 		for {
 			select {
 			case <-ticker.C:
-				if bucket.Tokens < bucket.Capacity {
-					bucket.Tokens++
+				if b.Tokens < b.Capacity {
+					b.Tokens++
 				} else {
 					b.Notify <- true
 				}
@@ -24,12 +39,31 @@ func (b *TokenBucket) Start(ctx context.Context) {
 				log.Print(ctx.Err())
 				ticker.Stop()
 				return
+			case <-b.Delay:
+				// Increase attempt value
+				if b.Attempt < b.TRetry.Limit {
+					b.Attempt++
+
+					//Increase ticking time based on strategy user provided
+					ticker.Stop()
+					ticker = time.NewTicker(b.retry())
+				} else {
+					ticker.Stop()
+				} // we got to Limit value, and should put timer to sleep
+
+			case <-b.Reset:
+				// Reset retry
+				b.Attempt = 0
+
+				// Reset Ticker
+				interval = model.DetermineInterval(b.FillInterval)
+				ticker = time.NewTicker(interval)
 			}
 		}
-	}(b)
+	}()
 }
 
-func (b *TokenBucket) TakeAll() (bool, int) {
+func (b *TokenBucket) TakeAll() (bool, int64) {
 	if b.Tokens == 0 {
 		return false, 0
 	}
@@ -41,63 +75,22 @@ func (b *TokenBucket) TakeAll() (bool, int) {
 	return false, 0
 }
 
-func (t *TaskQueue) newWorker(ctx context.Context, killOnDone bool) *Worker {
-	jobs := make(chan *pb.Task)
-	kill := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				log.Print(ctx.Err())
-				return
-			case <-jobs: //TODO: Do something with the task
-				log.Print("Do something")
-
-				if killOnDone {
-					return
-				}
-				done <- true
-			case <-kill:
-				return
-			}
-		}
-	}()
-
-	return &Worker{
-		Kill: kill,
-		Jobs: jobs,
-		Done: done,
-	}
-}
-
-func (t *TaskQueue) spawn(ctx context.Context, tokens int) bool {
-	tasks, err := t.Queue.TakeTasks(ctx, tokens)
-	if err != nil {
-		return false
-	}
-
-	if tokens <= t.MaxWorkers {
-		miss := math.Abs(len(t.WorkerPool) - tokens)
-		for i := 0; i < miss; i++ {
-			t.newWorker(ctx, true)
-		}
-	}
-
-	for i, v := range tasks {
-		t.WoorkerPool[i] <- ch
-	}
-	return true
-}
-
 func (t *TaskQueue) Loop(ctx context.Context) {
 	go func() {
 		for {
 			select {
 			case <-t.Bucket.Notify:
-				done, tokens := t.Bucket.TakeAll()
-				if done {
-					t.spawn(ctx, tokens)
+				//if pool is ready to take new tasks, take them...oterwise signal tockenbucket to increase notify time.
+				//When pool is ready to take new tasks reset toke bucket to regular interval
+				if t.Pool.Ready(t.Bucket.Capacity) {
+					done, tokens := t.Bucket.TakeAll()
+					if done {
+						if sync := t.Sync(ctx, tokens); !sync {
+							t.Bucket.Delay <- true // if there are no tasks in queue. Try it for a few times, than go to sleep unitl next task submit
+						}
+					}
+				} else {
+					t.Bucket.Delay <- true // if pool not ready, make delay
 				}
 			case <-ctx.Done():
 				log.Print(ctx.Err())
@@ -113,5 +106,19 @@ func (t *TaskQueue) StartQueue(ctx context.Context) {
 }
 
 func (t *TaskQueue) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
+	t.Bucket.Reset <- true
 	return t.Queue.PutTasks(ctx, req)
+}
+
+func (t *TaskQueue) Sync(ctx context.Context, tokens int64) bool {
+	tasks, err := t.Queue.TakeTasks(ctx, t.Name, "", tokens)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	for _, task := range tasks {
+		t.Pool.Pipe <- task
+	}
+
+	return len(tasks) > 0 // if TakeTasks return 0 that means that there is no tasks to pick from queue.
 }

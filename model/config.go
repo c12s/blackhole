@@ -32,8 +32,8 @@ type Retry struct {
 type Queue struct {
 	TRetry     Retry        `yaml:"retry"`
 	MaxWorkers int          `yaml:"maxWorkers"`
-	Capacity   int          `yaml:"capacity"`
-	Tokens     int          `yaml:"tokens"`
+	Capacity   int64        `yaml:"capacity"`
+	Tokens     int64        `yaml:"tokens"`
 	Rate       FillInterval `yaml:"fillInterval"`
 }
 
@@ -48,8 +48,8 @@ type TaskOption struct {
 	Name       string
 	MaxWorkers int
 	MaxQueued  int
-	Capacity   int
-	Tokens     int
+	Capacity   int64
+	Tokens     int64
 	FillRate   *FillInterval
 }
 

@@ -1,7 +1,6 @@
 package etcd
 
 import (
-	"context"
 	"github.com/coreos/etcd/clientv3"
 	"time"
 )
@@ -11,7 +10,7 @@ type StorageEtcd struct {
 	Client *clientv3.Client
 }
 
-func New(ctx context.Context, addr []string, timeout time.Duration) (*StorageEtcd, error) {
+func New(addr []string, timeout time.Duration) (*StorageEtcd, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		DialTimeout: timeout,
 		Endpoints:   addr,
