@@ -35,6 +35,13 @@ enum CompareKind {
     ANY = 1;
 }
 
+enum TaskStatus {
+    Waiting = 0;
+    Working = 1;
+    Done = 2;
+    // Running = 3;
+}
+
 
 // Request helper messages
 message Strategy {
@@ -90,6 +97,7 @@ message Task {
         int64 timestamp = 3;
         string namespace = 4;
         PutTask task = 5;
+        TaskStatus status = 6;
 }
 
 
