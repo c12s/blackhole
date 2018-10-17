@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"github.com/c12s/blackhole/model"
-	pb "github.com/c12s/blackhole/pb"
 	storage "github.com/c12s/blackhole/storage"
+	pb "github.com/c12s/scheme/core"
 )
 
 type TokenBucket struct {
