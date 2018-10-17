@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	queues = "queues"
-	tasks  = "tasks"
+	queues   = "queues"
+	tasks    = "tasks"
+	qdefault = "default"
 )
 
 // queues/queue_name/tasks -> will be stored in db
