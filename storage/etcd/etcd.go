@@ -24,7 +24,9 @@ func (s *StorageEtcd) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, e
 		}
 
 		var key = ""
-		if req.Mtdata.ForceNamespaceQueue {
+		if req.Mtdata.Namespace == "" && req.Mtdata.Queue == "" {
+			key = TaskKey(req.UserId, qdefault, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+		} else if req.Mtdata.ForceNamespaceQueue {
 			key = TaskKey(req.UserId, req.Mtdata.Namespace, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
 		} else {
 			key = TaskKey(req.UserId, req.Mtdata.Queue, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
