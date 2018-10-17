@@ -3,7 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
-	pb "github.com/c12s/blackhole/pb"
+	pb "github.com/c12s/scheme/core"
 	"log"
 )
 

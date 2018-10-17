@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	pb "github.com/c12s/blackhole/pb"
+	bPb "github.com/c12s/scheme/blackhole"
+	cPb "github.com/c12s/scheme/core"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/protobuf/proto"
 )
 
-func (s *StorageEtcd) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
+func (s *StorageEtcd) PutTasks(ctx context.Context, req *bPb.PutReq) (*bPb.Resp, error) {
 	for num, task := range req.Tasks {
-		qt := &pb.Task{
+		qt := &cPb.Task{
 			UserId:    req.UserId,
 			Kind:      req.Kind,
 			Timestamp: req.Mtdata.Timestamp,
@@ -40,8 +41,8 @@ func (s *StorageEtcd) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, e
 	return nil, nil
 }
 
-func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, tokens int64) (map[string]*pb.Task, error) {
-	retTasks := map[string]*pb.Task{}
+func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, tokens int64) (map[string]*cPb.Task, error) {
+	retTasks := map[string]*cPb.Task{}
 	key := QueueKey(user_id, name)
 	opts := []clientv3.OpOption{
 		clientv3.WithPrefix(),
@@ -64,7 +65,7 @@ func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, token
 
 	if int64(len(gresp.Kvs)) == dresp.Deleted {
 		for _, item := range gresp.Kvs {
-			newTask := &pb.Task{}
+			newTask := &cPb.Task{}
 			err = proto.Unmarshal(item.Value, newTask)
 			if err != nil {
 				fmt.Println(err) // TODO: this should go to some log system!!

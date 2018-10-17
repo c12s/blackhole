@@ -3,7 +3,7 @@ package queue
 import (
 	"context"
 	"github.com/c12s/blackhole/model"
-	pb "github.com/c12s/blackhole/pb"
+	pb "github.com/c12s/scheme/blackhole"
 	"log"
 	"math"
 	"time"

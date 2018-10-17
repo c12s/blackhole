@@ -3,9 +3,9 @@ package service
 import (
 	"fmt"
 	"github.com/c12s/blackhole/model"
-	pb "github.com/c12s/blackhole/pb"
 	"github.com/c12s/blackhole/queue"
 	storage "github.com/c12s/blackhole/storage"
+	pb "github.com/c12s/scheme/blackhole"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"log"
