@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/c12s/blackhole/model"
 	storage "github.com/c12s/blackhole/storage"
 	pb "github.com/c12s/scheme/core"
@@ -20,10 +21,11 @@ type TokenBucket struct {
 }
 
 type TaskQueue struct {
-	Name   string
-	Queue  storage.DB
-	Bucket *TokenBucket
-	Pool   *WorkerPool
+	Namespace string
+	Name      string
+	Queue     storage.DB
+	Bucket    *TokenBucket
+	Pool      *WorkerPool
 }
 
 type Worker struct {
@@ -64,12 +66,13 @@ func newPool(ctx context.Context, maxqueued, maxworkers int) *WorkerPool {
 	}
 }
 
-func newQueue(name string, tb *TokenBucket, wp *WorkerPool, db storage.DB) *TaskQueue {
+func newQueue(ns, name string, tb *TokenBucket, wp *WorkerPool, db storage.DB) *TaskQueue {
 	return &TaskQueue{
-		Name:   name,
-		Queue:  db,
-		Bucket: tb,
-		Pool:   wp,
+		Namespace: ns,
+		Name:      name,
+		Queue:     db,
+		Bucket:    tb,
+		Pool:      wp,
 	}
 }
 
@@ -91,12 +94,20 @@ func New(ctx context.Context, db storage.DB, options []*model.TaskOption) *Black
 	for _, opt := range options {
 		tb := newBucket(opt.Capacity, opt.Tokens, opt.FillRate, opt.TRetry)
 		wp := newPool(ctx, opt.MaxQueued, opt.MaxWorkers)
-		tq := newQueue(opt.Name, tb, wp, db)
+		tq := newQueue(opt.Namespace, opt.Name, tb, wp, db)
 
+		// Add queue to the database
+		err := db.AddQueue(ctx, opt)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Queue not created: ", opt.Name)
+			continue
+		}
+
+		// Start queue
 		q[opt.Name] = tq
 		tq.StartQueue(ctx)
 	}
-
 	return &BlackHole{
 		Queues: q,
 	}

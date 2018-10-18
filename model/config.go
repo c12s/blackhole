@@ -30,6 +30,7 @@ type Retry struct {
 }
 
 type Queue struct {
+	Namespace  string       `yaml:"namespace"`
 	TRetry     Retry        `yaml:"retry"`
 	MaxWorkers int          `yaml:"maxWorkers"`
 	Capacity   int64        `yaml:"capacity"`
@@ -44,13 +45,14 @@ type BlackHoleConfig struct {
 }
 
 type TaskOption struct {
-	TRetry     *Retry
-	Name       string
-	MaxWorkers int
-	MaxQueued  int
-	Capacity   int64
-	Tokens     int64
-	FillRate   *FillInterval
+	TRetry     *Retry        `yaml:"retry"`
+	Namespace  string        `yaml:"namespace"`
+	Name       string        `yaml:"name"`
+	MaxWorkers int           `yaml:"maxWorkers"`
+	MaxQueued  int           `yaml:"maxQueued"`
+	Capacity   int64         `yaml:"capacity"`
+	Tokens     int64         `yaml:"tokens"`
+	FillRate   *FillInterval `yaml:"fillInterval"`
 }
 
 func DetermineInterval(ft *FillInterval) time.Duration {
@@ -86,6 +88,7 @@ func configToOption(bcf *Config) *BlackHoleConfig {
 		to := &TaskOption{
 			TRetry:     &q.TRetry,
 			Name:       name,
+			Namespace:  q.Namespace,
 			MaxWorkers: q.MaxWorkers,
 			MaxQueued:  q.MaxWorkers,
 			Capacity:   q.Capacity,
