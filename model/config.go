@@ -101,7 +101,7 @@ func configToOption(bcf *Config) *BlackHoleConfig {
 	tretry := &Retry{
 		Delay:    "linear",
 		Doubling: 1,
-		Limit:    5,
+		Limit:    500,
 	}
 
 	fr := &FillInterval{
@@ -113,6 +113,7 @@ func configToOption(bcf *Config) *BlackHoleConfig {
 	dtk := &TaskOption{
 		TRetry:     tretry,
 		Name:       "default",
+		Namespace:  "default",
 		MaxWorkers: 5,
 		MaxQueued:  5,
 		Capacity:   5,
