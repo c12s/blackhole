@@ -2,8 +2,8 @@ package etcd
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/c12s/blackhole/model"
 	bPb "github.com/c12s/scheme/blackhole"
 	cPb "github.com/c12s/scheme/core"
 	"github.com/coreos/etcd/clientv3"
@@ -78,29 +78,21 @@ func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, token
 	return retTasks, nil
 }
 
-func (s *StorageEtcd) AddQueue(ctx context.Context, name, user_id string) error {
-	key := QueueKey(user_id, name)
-	opts := []clientv3.OpOption{
-		clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend),
-	}
-	gresp, err := s.Kv.Get(ctx, key, opts...)
+func (s *StorageEtcd) AddQueue(ctx context.Context, opt *model.TaskOption) error {
+	key := NewQueueKey(opt.Namespace, opt.Name)
+	err, value := toString(opt)
 	if err != nil {
 		return err
 	}
-
-	if len(gresp.Kvs) > 0 {
-		return errors.New("Queue already exists!")
-	}
-
-	_, err = s.Kv.Put(ctx, key, fmt.Sprintf("%s_queue", name))
+	_, err = s.Kv.Put(ctx, key, value)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *StorageEtcd) RemoveQueue(ctx context.Context, name, user_id string) error {
-	key := QueueKey(user_id, name)
+func (s *StorageEtcd) RemoveQueue(ctx context.Context, name, namespace string) error {
+	key := RemoveQueueKey(namespace, name)
 	_, err := s.Kv.Delete(ctx, key, clientv3.WithPrefix())
 	if err != nil {
 		return err

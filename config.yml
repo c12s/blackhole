@@ -4,10 +4,11 @@ blackhole:
     - 0.0.0.0:2379
   queue:
     myqueue1:
+      namespace: mynamespace
       retry:
         delay: linear # [linear | exp ] -> interval * (doubling + attempt)
         doubling: 1 # increase wait on next retry
-        limit: 5 # try 5 times before go to 'sleep' and tocke bucket is not notify
+        limit: 50000 # try 5 times before go to 'sleep' and tocke bucket is not notify
       maxWorkers: 4 # max number of warkers to spawn
       capacity: 4 # capacity of token bucket, when full burst
       tokens: 0 # number of tokens to start
@@ -15,10 +16,11 @@ blackhole:
         interval: 1
         rate: s # [s/second | ms/milisecond | m/minute | h/hour]
     myqueue2:
+      namespace: default
       retry:
         delay: exp # [linear | exp ]
         doubling: 2 # increase wait on next retry -> interval * (doubling ^ attempt)
-        limit: 5 # try 5 times before go to 'sleep' and tocke bucket is not notify
+        limit: 50000 # try 5 times before go to 'sleep' and tocke bucket is not notify
       maxWorkers: 5
       capacity: 5
       tokens: 0
