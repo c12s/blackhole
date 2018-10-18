@@ -16,11 +16,11 @@ func newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string
 			case <-ctx.Done():
 				log.Print(ctx.Err())
 				return
-			case <-jobs:
+			case task := <-jobs:
 				active <- wid // signal that worker is taken the job
 
 				// do some job send task to clusters/regions/nodes using nats or some other pbu/sub system.
-				log.Print("Do something")
+				log.Print("Doing... ", task)
 
 				done <- wid // signal that worker is free
 			case <-kill:

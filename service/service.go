@@ -37,24 +37,13 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 		return nil, err
 	}
 
-	go func() {
-		// Call celestial api and put into DB and set status as Waiting or something
-		// This i manuly so that user know that his task is submitted! After
-		// the task is taken from queue and executed that key will be updated
-		// with some real value!
-	}()
-
-	go func() {
-		pResp, err := tk.PutTasks(ctx, req)
-		if err != nil {
-			fmt.Println(err) //TODO: This should go in some log system! And should update celestial api that there was an error!
-			return
-		}
-		fmt.Println(pResp) //TODO: This should go in some log system
-	}()
+	pResp, err := tk.PutTasks(ctx, req)
+	if err != nil {
+		log.Println(err)
+	}
 
 	// return to client that task is accepted!
-	return &pb.Resp{Msg: "Accepted"}, nil
+	return &pb.Resp{Msg: pResp.Msg}, nil
 }
 
 func Run(ctx context.Context, db storage.DB, address string, opts []*model.TaskOption) {

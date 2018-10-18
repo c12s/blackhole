@@ -32,7 +32,7 @@ func QueueKey(namespace, queueName string) string {
 // ex: queues/mynamespace:myqueue1/tasks/mytask/mytask_1_1234567890 | queues/default:myqueue1/tasks/mytask/mytask_1_1234567890
 func TaskKey(namespace, queueName, taskName string, timestamp int64, id int) string {
 	prefix := TaskGroupKey(namespace, queueName, taskName)
-	fTaskName := fmt.Sprintf("%s_%d_%d", taskName, timestamp)
+	fTaskName := fmt.Sprintf("%s_%d_%d", taskName, id, timestamp)
 	s := []string{prefix, fTaskName}
 	return strings.Join(s, "/")
 }

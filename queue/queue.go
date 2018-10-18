@@ -49,15 +49,20 @@ func (b *TokenBucket) Start(ctx context.Context) {
 					ticker = time.NewTicker(b.retry())
 				} else {
 					ticker.Stop()
+					ticker = nil // put tockenbucket in sleep state
 				} // we got to Limit value, and should put timer to sleep
 
 			case <-b.Reset:
-				// Reset retry
-				b.Attempt = 0
+				// if ticker is nil, than token bucket is in 'sleep state' -> not ticking
+				// and need to be restarted! This is done on next task update
+				if ticker == nil {
+					// Reset retry
+					b.Attempt = 0
 
-				// Reset Ticker
-				interval = model.DetermineInterval(b.FillInterval)
-				ticker = time.NewTicker(interval)
+					// Reset Ticker
+					interval = model.DetermineInterval(b.FillInterval)
+					ticker = time.NewTicker(interval)
+				}
 			}
 		}
 	}()
@@ -111,7 +116,7 @@ func (t *TaskQueue) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, err
 }
 
 func (t *TaskQueue) Sync(ctx context.Context, tokens int64) bool {
-	tasks, err := t.Queue.TakeTasks(ctx, t.Name, "", tokens)
+	tasks, err := t.Queue.TakeTasks(ctx, t.Name, t.Namespace, tokens)
 	if err != nil {
 		log.Println(err)
 		return false
