@@ -26,11 +26,11 @@ func (s *StorageEtcd) PutTasks(ctx context.Context, req *bPb.PutReq) (*bPb.Resp,
 
 		var key = ""
 		if req.Mtdata.Namespace == "" && req.Mtdata.Queue == "" {
-			key = TaskKey(req.UserId, qdefault, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+			key = TaskKey(qdefault, qdefault, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
 		} else if req.Mtdata.ForceNamespaceQueue {
-			key = TaskKey(req.UserId, req.Mtdata.Namespace, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+			key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Namespace, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
 		} else {
-			key = TaskKey(req.UserId, req.Mtdata.Queue, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+			key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Queue, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
 		}
 
 		_, err = s.Kv.Put(ctx, key, string(data))
@@ -38,12 +38,12 @@ func (s *StorageEtcd) PutTasks(ctx context.Context, req *bPb.PutReq) (*bPb.Resp,
 			fmt.Println(err) //TODO: this should go to some log system!!
 		}
 	}
-	return nil, nil
+	return &bPb.Resp{Msg: "Task accepted"}, nil
 }
 
-func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, tokens int64) (map[string]*cPb.Task, error) {
+func (s *StorageEtcd) TakeTasks(ctx context.Context, name, namespace string, tokens int64) (map[string]*cPb.Task, error) {
 	retTasks := map[string]*cPb.Task{}
-	key := QueueKey(user_id, name)
+	key := QueueKey(namespace, name)
 	opts := []clientv3.OpOption{
 		clientv3.WithPrefix(),
 		clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend),
@@ -58,20 +58,19 @@ func (s *StorageEtcd) TakeTasks(ctx context.Context, name, user_id string, token
 		return retTasks, nil
 	}
 
-	dresp, err2 := s.Kv.Delete(ctx, key, opts...)
-	if err2 != nil {
-		return nil, err2
-	}
-
-	if int64(len(gresp.Kvs)) == dresp.Deleted {
+	if int64(len(gresp.Kvs)) <= tokens {
 		for _, item := range gresp.Kvs {
 			newTask := &cPb.Task{}
 			err = proto.Unmarshal(item.Value, newTask)
 			if err != nil {
-				fmt.Println(err) // TODO: this should go to some log system!!
-				continue
+				return nil, err
 			}
+
 			retTasks[string(item.Key)] = newTask
+			_, err = s.Kv.Delete(ctx, string(item.Key))
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
