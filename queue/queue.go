@@ -32,7 +32,7 @@ func (b *TokenBucket) Start(ctx context.Context) {
 			case <-ticker.C:
 				if b.Tokens < b.Capacity {
 					b.Tokens++
-				} else {
+				} else if b.Tokens == b.Capacity {
 					b.Notify <- true
 				}
 			case <-ctx.Done():
@@ -68,16 +68,9 @@ func (b *TokenBucket) Start(ctx context.Context) {
 	}()
 }
 
-func (b *TokenBucket) TakeAll() (bool, int64) {
-	if b.Tokens == 0 {
-		return false, 0
-	}
-
-	if b.Tokens == b.Capacity {
-		b.Tokens = 0
-		return true, b.Capacity
-	}
-	return false, 0
+func (b *TokenBucket) TakeAll() int64 {
+	b.Tokens = 0
+	return b.Capacity
 }
 
 func (t *TaskQueue) Loop(ctx context.Context) {
@@ -87,16 +80,19 @@ func (t *TaskQueue) Loop(ctx context.Context) {
 			case <-t.Bucket.Notify:
 				//if pool is ready to take new tasks, take them...oterwise signal tockenbucket to increase notify time.
 				//When pool is ready to take new tasks reset toke bucket to regular interval
-				if t.Pool.Ready(t.Bucket.Capacity) {
-					done, tokens := t.Bucket.TakeAll()
-					if done {
-						if sync := t.Sync(ctx, tokens); !sync {
-							t.Bucket.Delay <- true // if there are no tasks in queue. Try it for a few times, than go to sleep unitl next task submit
-						}
-					}
-				} else {
-					t.Bucket.Delay <- true // if pool not ready, make delay
-				}
+				// if t.Pool.Ready(t.Bucket.Capacity) {
+				// 	done, tokens := t.Bucket.TakeAll()
+				// 	if done {
+				// 		if sync := t.Sync(ctx, tokens); !sync {
+				// 			t.Bucket.Delay <- true // if there are no tasks in queue. Try it for a few times, than go to sleep unitl next task submit
+				// 		}
+				// 	}
+				// } else {
+				// 	t.Bucket.Delay <- true // if pool not ready, make delay
+				// }
+
+				tokens := t.Bucket.TakeAll()
+				t.Sync(ctx, tokens)
 			case <-ctx.Done():
 				log.Print(ctx.Err())
 				return
@@ -111,7 +107,7 @@ func (t *TaskQueue) StartQueue(ctx context.Context) {
 }
 
 func (t *TaskQueue) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
-	t.Bucket.Reset <- true
+	// t.Bucket.Reset <- true
 	return t.Queue.PutTasks(ctx, req)
 }
 
@@ -121,6 +117,11 @@ func (t *TaskQueue) Sync(ctx context.Context, tokens int64) bool {
 		log.Println(err)
 		return false
 	}
+
+	if len(tasks) == 0 {
+		return true
+	}
+
 	for _, task := range tasks {
 		t.Pool.Pipe <- task
 	}

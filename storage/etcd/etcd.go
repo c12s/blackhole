@@ -10,33 +10,46 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+func (s *StorageEtcd) put(ctx context.Context, req *bPb.PutReq, num int, task *bPb.PutTask) {
+	qt := &cPb.Task{
+		UserId:    req.UserId,
+		Kind:      req.Kind,
+		Timestamp: req.Mtdata.Timestamp,
+		Namespace: req.Mtdata.Namespace,
+		Extras:    req.Extras,
+	}
+
+	if task != nil {
+		qt.Task = task
+	}
+
+	data, err := proto.Marshal(qt)
+	if err != nil {
+		fmt.Println(err) //TODO: this should go to some log system!!
+	}
+
+	var key = ""
+	if req.Mtdata.Namespace == "" && req.Mtdata.Queue == "" {
+		key = TaskKey(qdefault, qdefault, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+	} else if req.Mtdata.ForceNamespaceQueue {
+		key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Namespace, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+	} else {
+		key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Queue, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
+	}
+
+	_, err = s.Kv.Put(ctx, key, string(data))
+	if err != nil {
+		fmt.Println(err) //TODO: this should go to some log system!!
+	}
+}
+
 func (s *StorageEtcd) PutTasks(ctx context.Context, req *bPb.PutReq) (*bPb.Resp, error) {
-	for num, task := range req.Tasks {
-		qt := &cPb.Task{
-			UserId:    req.UserId,
-			Kind:      req.Kind,
-			Timestamp: req.Mtdata.Timestamp,
-			Namespace: req.Mtdata.Namespace,
-			Task:      task,
+	if len(req.Tasks) > 0 {
+		for num, task := range req.Tasks {
+			s.put(ctx, req, num, task)
 		}
-		data, err := proto.Marshal(qt)
-		if err != nil {
-			fmt.Println(err) //TODO: this should go to some log system!!
-		}
-
-		var key = ""
-		if req.Mtdata.Namespace == "" && req.Mtdata.Queue == "" {
-			key = TaskKey(qdefault, qdefault, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
-		} else if req.Mtdata.ForceNamespaceQueue {
-			key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Namespace, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
-		} else {
-			key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Queue, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
-		}
-
-		_, err = s.Kv.Put(ctx, key, string(data))
-		if err != nil {
-			fmt.Println(err) //TODO: this should go to some log system!!
-		}
+	} else {
+		s.put(ctx, req, 0, nil)
 	}
 	return &bPb.Resp{Msg: "Task accepted"}, nil
 }
@@ -54,10 +67,6 @@ func (s *StorageEtcd) TakeTasks(ctx context.Context, name, namespace string, tok
 		return nil, err
 	}
 
-	if len(gresp.Kvs) == 0 {
-		return retTasks, nil
-	}
-
 	if int64(len(gresp.Kvs)) <= tokens {
 		for _, item := range gresp.Kvs {
 			newTask := &cPb.Task{}
@@ -65,7 +74,6 @@ func (s *StorageEtcd) TakeTasks(ctx context.Context, name, namespace string, tok
 			if err != nil {
 				return nil, err
 			}
-
 			retTasks[string(item.Key)] = newTask
 			_, err = s.Kv.Delete(ctx, string(item.Key))
 			if err != nil {
