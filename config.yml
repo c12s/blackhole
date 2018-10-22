@@ -1,5 +1,6 @@
 blackhole:
   address: localhost:8081
+  celestial: localhost:8000
   db:
     - 0.0.0.0:2379
   queue:
@@ -25,7 +26,7 @@ blackhole:
       capacity: 5
       tokens: 0
       fillInterval:
-        interval: 2
-        rate: ms # [s/second | ms/milisecond | m/minute | h/hour]
+        interval: 1
+        rate: s # [s/second | ms/milisecond | m/minute | h/hour]
 
 # when config file is loaded, n+1 queues will be created (+1 is a default)

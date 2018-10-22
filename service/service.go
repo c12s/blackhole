@@ -46,7 +46,7 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 	return &pb.Resp{Msg: pResp.Msg}, nil
 }
 
-func Run(ctx context.Context, db storage.DB, address string, opts []*model.TaskOption) {
+func Run(ctx context.Context, db storage.DB, address, celestial string, opts []*model.TaskOption) {
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("failed to initializa TCP listen: %v", err)
@@ -55,7 +55,7 @@ func Run(ctx context.Context, db storage.DB, address string, opts []*model.TaskO
 
 	server := grpc.NewServer()
 	blackholeServer := &Server{
-		Queue: queue.New(ctx, db, opts),
+		Queue: queue.New(ctx, db, opts, celestial),
 	}
 
 	fmt.Println("BlackHoleService RPC Started")

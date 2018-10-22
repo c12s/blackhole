@@ -31,6 +31,7 @@ type TaskQueue struct {
 type Worker struct {
 	ID   string
 	Kill chan bool
+	// Msg  chan string
 }
 
 type WorkerPool struct {
@@ -41,6 +42,7 @@ type WorkerPool struct {
 	done          chan string
 	active        chan string
 	Workers       map[string]*Worker
+	Celestial     string
 }
 
 type BlackHole struct {
@@ -54,16 +56,19 @@ func (bh *BlackHole) GetTK(name string) (*TaskQueue, error) {
 	return nil, errors.New("Queue not exists!")
 }
 
-func newPool(ctx context.Context, maxqueued, maxworkers int) *WorkerPool {
-	return &WorkerPool{
+func newPool(ctx context.Context, maxqueued, maxworkers int, celestial string) *WorkerPool {
+	wp := &WorkerPool{
 		MaxQueued:     maxqueued,
 		MaxWorkers:    maxworkers,
-		Pipe:          make(chan *pb.Task),
+		Pipe:          make(chan *pb.Task, 100),
 		ActiveWorkers: map[string]*Worker{},
 		done:          make(chan string),
 		active:        make(chan string),
 		Workers:       map[string]*Worker{},
+		Celestial:     celestial,
 	}
+	wp.init(ctx)
+	return wp
 }
 
 func newQueue(ns, name string, tb *TokenBucket, wp *WorkerPool, db storage.DB) *TaskQueue {
@@ -89,11 +94,11 @@ func newBucket(capacity, tokens int64, interval *model.FillInterval, retry *mode
 	}
 }
 
-func New(ctx context.Context, db storage.DB, options []*model.TaskOption) *BlackHole {
+func New(ctx context.Context, db storage.DB, options []*model.TaskOption, celestial string) *BlackHole {
 	q := map[string]*TaskQueue{}
 	for _, opt := range options {
 		tb := newBucket(opt.Capacity, opt.Tokens, opt.FillRate, opt.TRetry)
-		wp := newPool(ctx, opt.MaxQueued, opt.MaxWorkers)
+		wp := newPool(ctx, opt.MaxQueued, opt.MaxWorkers, celestial)
 		tq := newQueue(opt.Namespace, opt.Name, tb, wp, db)
 
 		// Add queue to the database

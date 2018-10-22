@@ -3,33 +3,37 @@ package queue
 import (
 	"context"
 	"fmt"
+	cPb "github.com/c12s/scheme/celestial"
 	pb "github.com/c12s/scheme/core"
 	"log"
 )
 
-func newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int) *Worker {
+func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int, celestial string) {
 	wid := fmt.Sprintf("worker_%d")
 	kill := make(chan bool)
-	go func(idx string) {
-		for {
-			select {
-			case <-ctx.Done():
-				log.Print(ctx.Err())
-				return
-			case task := <-jobs:
-				active <- wid // signal that worker is taken the job
+	for {
+		select {
+		case <-ctx.Done():
+			log.Print(ctx.Err())
+			return
+		case task := <-jobs:
+			active <- wid // signal that worker is taken the job
 
-				// do some job send task to clusters/regions/nodes using nats or some other pbu/sub system.
-				log.Print("Doing... ", task)
-
-				done <- wid // signal that worker is free
-			case <-kill:
-				log.Print("Worker killed")
-				return
+			mt := &cPb.MutateReq{task}
+			client := NewCelestialClient(celestial)
+			_, err := client.Mutate(ctx, mt)
+			if err != nil {
+				log.Println(err)
 			}
+
+			done <- wid // signal that worker is free
+		case <-kill:
+			log.Print("Worker killed")
+			return
 		}
-	}(wid)
-	return &Worker{
+	}
+
+	wp.Workers[wid] = &Worker{
 		ID:   wid,
 		Kill: kill,
 	}
@@ -37,8 +41,7 @@ func newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string
 
 func (wp *WorkerPool) init(ctx context.Context) {
 	for i := 0; i < wp.MaxWorkers; i++ {
-		wk := newWorker(ctx, wp.Pipe, wp.done, wp.active, i)
-		wp.Workers[wk.ID] = wk
+		go wp.newWorker(ctx, wp.Pipe, wp.done, wp.active, i, wp.Celestial)
 	}
 	go func() {
 		for {

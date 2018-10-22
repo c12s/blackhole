@@ -13,9 +13,10 @@ type Config struct {
 }
 
 type BlackHole struct {
-	Address string           `yaml:"address"`
-	DB      []string         `yaml:"db"`
-	Queues  map[string]Queue `yaml:"queue"`
+	Address   string           `yaml:"address"`
+	Celestial string           `yaml:"celestial"`
+	DB        []string         `yaml:"db"`
+	Queues    map[string]Queue `yaml:"queue"`
 }
 
 type FillInterval struct {
@@ -39,9 +40,10 @@ type Queue struct {
 }
 
 type BlackHoleConfig struct {
-	Address string
-	DB      []string
-	Opts    []*TaskOption
+	Address   string
+	Celestial string
+	DB        []string
+	Opts      []*TaskOption
 }
 
 type TaskOption struct {
@@ -122,9 +124,10 @@ func configToOption(bcf *Config) *BlackHoleConfig {
 	}
 	opts = append(opts, dtk)
 	return &BlackHoleConfig{
-		Address: bcf.Content.Address,
-		DB:      bcf.Content.DB,
-		Opts:    opts,
+		Address:   bcf.Content.Address,
+		Celestial: bcf.Content.Celestial,
+		DB:        bcf.Content.DB,
+		Opts:      opts,
 	}
 }
 
