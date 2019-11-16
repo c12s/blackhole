@@ -19,7 +19,7 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 		case task := <-jobs:
 			active <- wid // signal that worker is taken the job
 
-			mt := &cPb.MutateReq{task}
+			mt := &cPb.MutateReq{Mutate: task}
 			client := NewCelestialClient(celestial)
 			_, err := client.Mutate(ctx, mt)
 			if err != nil {
