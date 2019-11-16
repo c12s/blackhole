@@ -1,5 +1,5 @@
 blackhole:
-  address: localhost:8081
+  address: localhost:8082
   celestial: localhost:8000
   db:
     - 0.0.0.0:2379
