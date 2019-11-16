@@ -25,6 +25,7 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 			if err != nil {
 				log.Println(err)
 			}
+			fmt.Println("Otisao zahtev u celestial")
 
 			done <- wid // signal that worker is free
 		case <-kill:
