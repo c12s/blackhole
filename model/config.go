@@ -15,6 +15,7 @@ type Config struct {
 type BlackHole struct {
 	Address   string           `yaml:"address"`
 	Celestial string           `yaml:"celestial"`
+	Apollo    string           `yaml:"apollo"`
 	DB        []string         `yaml:"db"`
 	Queues    map[string]Queue `yaml:"queue"`
 }
@@ -42,6 +43,7 @@ type Queue struct {
 type BlackHoleConfig struct {
 	Address   string
 	Celestial string
+	Apollo    string
 	DB        []string
 	Opts      []*TaskOption
 }
@@ -126,6 +128,7 @@ func configToOption(bcf *Config) *BlackHoleConfig {
 	return &BlackHoleConfig{
 		Address:   bcf.Content.Address,
 		Celestial: bcf.Content.Celestial,
+		Apollo:    bcf.Content.Apollo,
 		DB:        bcf.Content.DB,
 		Opts:      opts,
 	}

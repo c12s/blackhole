@@ -24,6 +24,6 @@ func main() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	service.Run(ctx, db, conf.Address, conf.Celestial, conf.Opts)
+	service.Run(ctx, db, conf.Address, conf.Celestial, conf.Apollo, conf.Opts)
 	cancel()
 }
