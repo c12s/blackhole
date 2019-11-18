@@ -1,6 +1,7 @@
 blackhole:
   address: localhost:8082
   celestial: localhost:8000
+  apollo: localhost:8083 
   db:
     - 0.0.0.0:2379
   queue:
