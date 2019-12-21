@@ -5,11 +5,17 @@ import (
 	"fmt"
 	cPb "github.com/c12s/scheme/celestial"
 	pb "github.com/c12s/scheme/core"
+	sg "github.com/c12s/stellar-go"
 	"log"
 )
 
 func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int, celestial string) {
-	wid := fmt.Sprintf("worker_%d")
+	span, _ := sg.FromContext(ctx, "newWorker")
+	defer span.Finish()
+	// fmt.Println(span)
+
+	wid := fmt.Sprintf("worker_%d", id)
+	span.AddLog(&sg.KV{"Worker id", wid})
 	kill := make(chan bool)
 	for {
 		select {
@@ -17,17 +23,25 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 			log.Print(ctx.Err())
 			return
 		case task := <-jobs:
+			span, _ := sg.FromCustomSource(
+				task.SpanContext,
+				task.SpanContext.Baggage,
+				"worker.pulltasks",
+			)
+			fmt.Println(span)
+			fmt.Println("SERIALIZE ", span.Serialize())
 			active <- wid // signal that worker is taken the job
 
 			mt := &cPb.MutateReq{Mutate: task}
 			client := NewCelestialClient(celestial)
-			_, err := client.Mutate(ctx, mt)
+			_, err := client.Mutate(sg.NewTracedGRPCContext(nil, span), mt)
 			if err != nil {
 				log.Println(err)
 			}
 			fmt.Println("Otisao zahtev u celestial")
 
 			done <- wid // signal that worker is free
+			span.Finish()
 		case <-kill:
 			log.Print("Worker killed")
 			return
@@ -41,8 +55,12 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 }
 
 func (wp *WorkerPool) init(ctx context.Context) {
+	span, _ := sg.FromContext(ctx, "init")
+	defer span.Finish()
+	// fmt.Println(span)
+
 	for i := 0; i < wp.MaxWorkers; i++ {
-		go wp.newWorker(ctx, wp.Pipe, wp.done, wp.active, i, wp.Celestial)
+		go wp.newWorker(sg.NewTracedContext(ctx, span), wp.Pipe, wp.done, wp.active, i, wp.Celestial)
 	}
 	go func() {
 		for {

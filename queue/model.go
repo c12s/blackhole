@@ -7,6 +7,7 @@ import (
 	"github.com/c12s/blackhole/model"
 	storage "github.com/c12s/blackhole/storage"
 	pb "github.com/c12s/scheme/core"
+	sg "github.com/c12s/stellar-go"
 )
 
 type TokenBucket struct {
@@ -49,14 +50,24 @@ type BlackHole struct {
 	Queues map[string]*TaskQueue
 }
 
-func (bh *BlackHole) GetTK(name string) (*TaskQueue, error) {
+func (bh *BlackHole) GetTK(ctx context.Context, name string) (*TaskQueue, error) {
+	span, _ := sg.FromGRPCContext(ctx, "queue.GetTK")
+	defer span.Finish()
+	fmt.Println(span)
+
 	if tk, ok := bh.Queues[name]; ok {
 		return tk, nil
 	}
-	return nil, errors.New("Queue not exists!")
+
+	span.AddLog(&sg.KV{"queue error", "Queue does not exists"})
+	return nil, errors.New("Queue does not exists!")
 }
 
 func newPool(ctx context.Context, maxqueued, maxworkers int, celestial string) *WorkerPool {
+	span, _ := sg.FromContext(ctx, "newPool")
+	defer span.Finish()
+	fmt.Println(span)
+
 	wp := &WorkerPool{
 		MaxQueued:     maxqueued,
 		MaxWorkers:    maxworkers,
@@ -67,11 +78,15 @@ func newPool(ctx context.Context, maxqueued, maxworkers int, celestial string) *
 		Workers:       map[string]*Worker{},
 		Celestial:     celestial,
 	}
-	wp.init(ctx)
+	wp.init(sg.NewTracedContext(ctx, span))
 	return wp
 }
 
-func newQueue(ns, name string, tb *TokenBucket, wp *WorkerPool, db storage.DB) *TaskQueue {
+func newQueue(ctx context.Context, ns, name string, tb *TokenBucket, wp *WorkerPool, db storage.DB) *TaskQueue {
+	span, _ := sg.FromContext(ctx, "newQueue")
+	defer span.Finish()
+	fmt.Println(span)
+
 	return &TaskQueue{
 		Namespace: ns,
 		Name:      name,
@@ -81,7 +96,11 @@ func newQueue(ns, name string, tb *TokenBucket, wp *WorkerPool, db storage.DB) *
 	}
 }
 
-func newBucket(capacity, tokens int64, interval *model.FillInterval, retry *model.Retry) *TokenBucket {
+func newBucket(ctx context.Context, capacity, tokens int64, interval *model.FillInterval, retry *model.Retry) *TokenBucket {
+	span, _ := sg.FromContext(ctx, "newBucket")
+	defer span.Finish()
+	fmt.Println(span)
+
 	return &TokenBucket{
 		Capacity:     capacity,
 		Tokens:       tokens,
@@ -95,23 +114,30 @@ func newBucket(capacity, tokens int64, interval *model.FillInterval, retry *mode
 }
 
 func New(ctx context.Context, db storage.DB, options []*model.TaskOption, celestial string) *BlackHole {
+	span, _ := sg.FromContext(ctx, "queue.New")
+	defer span.Finish()
+	fmt.Println(span)
+
 	q := map[string]*TaskQueue{}
 	for _, opt := range options {
-		tb := newBucket(opt.Capacity, opt.Tokens, opt.FillRate, opt.TRetry)
-		wp := newPool(ctx, opt.MaxQueued, opt.MaxWorkers, celestial)
-		tq := newQueue(opt.Namespace, opt.Name, tb, wp, db)
+		tb := newBucket(sg.NewTracedContext(ctx, span), opt.Capacity, opt.Tokens, opt.FillRate, opt.TRetry)
+		wp := newPool(sg.NewTracedContext(ctx, span), opt.MaxQueued, opt.MaxWorkers, celestial)
+		tq := newQueue(sg.NewTracedContext(ctx, span), opt.Namespace, opt.Name, tb, wp, db)
 
 		// Add queue to the database
-		err := db.AddQueue(ctx, opt)
+		err := db.AddQueue(sg.NewTracedContext(ctx, span), opt)
 		if err != nil {
-			fmt.Println(err)
+			span.AddLog(
+				&sg.KV{"Queue not created", err.Error()},
+				&sg.KV{"Queue not created", opt.Name},
+			)
 			fmt.Println("Queue not created: ", opt.Name)
 			continue
 		}
 
 		// Start queue
 		q[opt.Name] = tq
-		tq.StartQueue(ctx)
+		tq.StartQueue(sg.NewTracedContext(ctx, span))
 	}
 	return &BlackHole{
 		Queues: q,

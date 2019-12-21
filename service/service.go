@@ -7,73 +7,125 @@ import (
 	storage "github.com/c12s/blackhole/storage"
 	aPb "github.com/c12s/scheme/apollo"
 	pb "github.com/c12s/scheme/blackhole"
+	sg "github.com/c12s/stellar-go"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"strconv"
 	"time"
 )
 
 type Server struct {
-	Queue  *queue.BlackHole
-	Apollo string
+	Queue      *queue.BlackHole
+	Apollo     string
+	instrument map[string]string
 }
 
 func (s *Server) getTK(ctx context.Context, req *pb.PutReq) (*queue.TaskQueue, error) {
+	span, _ := sg.FromGRPCContext(ctx, "blackhole.getTK")
+	fmt.Println("SPAN: ", span)
+
+	defer span.Finish()
+	fmt.Println(span)
+
 	if req.Mtdata.ForceNamespaceQueue {
-		tk, err := s.Queue.GetTK(req.Mtdata.Namespace)
+		tk, err := s.Queue.GetTK(sg.NewTracedGRPCContext(ctx, span), req.Mtdata.Namespace)
 		if err != nil {
+			span.AddLog(&sg.KV{"Queue GetTK ForceNamespace error", err.Error()})
 			return nil, err
 		}
 		return tk, nil
 	}
-	tk, err := s.Queue.GetTK(req.Mtdata.Queue)
+	tk, err := s.Queue.GetTK(sg.NewTracedGRPCContext(ctx, span), req.Mtdata.Queue)
 	if err != nil {
+		span.AddLog(&sg.KV{"Queue GetTK error", err.Error()})
 		return nil, err
 	}
 	return tk, nil
 }
 
 func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
-	client := NewApolloClient(s.Apollo)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	span, _ := sg.FromGRPCContext(ctx, "blackhole.put")
+	defer span.Finish()
+	fmt.Println(span)
+	fmt.Println("SERIALIZE ", span.Serialize())
 
-	resp, err := client.Auth(ctx, &aPb.AuthOpt{})
+	client := NewApolloClient(s.Apollo)
+	resp, err := client.Auth(sg.NewTracedGRPCContext(ctx, span), &aPb.AuthOpt{
+		Data: map[string]string{
+			"intent": "put",
+			"kind":   "blackhole", // TODO: GET KIND: configs, secrets, ...
+			//TODO: ADD DATA!
+		},
+	})
 	if err != nil {
+		span.AddLog(&sg.KV{"apollo resp error", err.Error()})
 		return &pb.Resp{Msg: err.Error()}, nil
 	}
 
 	if !resp.Value {
-		return &pb.Resp{Msg: "You do not have access for this service"}, nil
+		span.AddLog(
+			&sg.KV{"apollo.auth value", strconv.FormatBool(resp.Value)},
+			&sg.KV{"apollo.auth message", resp.Data["message"]},
+		)
+		return &pb.Resp{Msg: resp.Data["message"]}, nil
 	}
 
-	tk, err := s.getTK(ctx, req)
+	tk, err := s.getTK(sg.NewTracedGRPCContext(ctx, span), req)
 	if err != nil {
+		span.AddLog(&sg.KV{"blackhole.Put getTK error", err.Error()})
 		return nil, err
 	}
 
-	pResp, err := tk.PutTasks(ctx, req)
+	pResp, err := tk.PutTasks(sg.NewTracedContext(ctx, span), req)
 	if err != nil {
+		span.AddLog(&sg.KV{"blackhole.Put PutTasks error", err.Error()})
 		log.Println(err)
 	}
+
+	span.AddLog(&sg.KV{"blackhole.Put ok", pResp.Msg})
 
 	// return to client that task is accepted!
 	return &pb.Resp{Msg: pResp.Msg}, nil
 }
 
-func Run(ctx context.Context, db storage.DB, address, celestial, apollo string, opts []*model.TaskOption) {
-	lis, err := net.Listen("tcp", address)
+func Run(db storage.DB, conf *model.BlackHoleConfig) {
+	trace := sg.Init("blackhole")
+	defer trace.Finish()
+
+	span := trace.Span("run")
+	defer span.Finish()
+	fmt.Println(span)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lis, err := net.Listen("tcp", conf.Address)
 	if err != nil {
+		span.AddLog(&sg.KV{"blackhole.run error", err.Error()})
 		log.Fatalf("failed to initializa TCP listen: %v", err)
 	}
 	defer lis.Close()
 
 	server := grpc.NewServer()
 	blackholeServer := &Server{
-		Queue:  queue.New(ctx, db, opts, celestial),
-		Apollo: apollo,
+		Queue:      queue.New(sg.NewTracedContext(ctx, span), db, conf.Opts, conf.Celestial),
+		Apollo:     conf.Apollo,
+		instrument: conf.InstrumentConf,
 	}
+
+	n, err := sg.NewCollector(blackholeServer.instrument["address"], blackholeServer.instrument["stopic"])
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c, err := sg.InitCollector(blackholeServer.instrument["location"], n)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	go c.Start(ctx, 15*time.Second)
 
 	fmt.Println("BlackHoleService RPC Started")
 	pb.RegisterBlackHoleServiceServer(server, blackholeServer)

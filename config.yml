@@ -29,5 +29,10 @@ blackhole:
       fillInterval:
         interval: 1
         rate: s # [s/second | ms/milisecond | m/minute | h/hour]
+  instrument:
+    address: 0.0.0.0:4222
+    stopic: collector
+    collect: 15s
+    location: logs/
 
 # when config file is loaded, n+1 queues will be created (+1 is a default)

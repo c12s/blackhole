@@ -2,10 +2,13 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"github.com/c12s/blackhole/model"
 	pb "github.com/c12s/scheme/blackhole"
+	sg "github.com/c12s/stellar-go"
 	"log"
 	"math"
+	"strconv"
 	"time"
 )
 
@@ -23,8 +26,16 @@ func (b *TokenBucket) retry() time.Duration {
 }
 
 func (b *TokenBucket) Start(ctx context.Context) {
+	span, _ := sg.FromContext(ctx, "tokenbacket.start")
+	defer span.Finish()
+	// fmt.Println(span)
+
 	//every fillTime we try to add new token to the bucket (execute the task)
-	go func() {
+	go func(c context.Context) {
+		span, _ := sg.FromContext(c, "tokenbacket.start.daemon")
+		defer span.Finish()
+		// fmt.Println(span)
+
 		interval := model.DetermineInterval(b.FillInterval)
 		ticker := time.NewTicker(interval)
 		for {
@@ -35,7 +46,8 @@ func (b *TokenBucket) Start(ctx context.Context) {
 				} else if b.Tokens == b.Capacity {
 					b.Notify <- true
 				}
-			case <-ctx.Done():
+			case <-c.Done():
+				span.AddLog(&sg.KV{"daemon done", c.Err().Error()})
 				log.Print(ctx.Err())
 				ticker.Stop()
 				return
@@ -65,16 +77,26 @@ func (b *TokenBucket) Start(ctx context.Context) {
 				}
 			}
 		}
-	}()
+	}(ctx)
 }
 
-func (b *TokenBucket) TakeAll() int64 {
+func (b *TokenBucket) TakeAll(ctx context.Context) int64 {
+	span, _ := sg.FromContext(ctx, "take all")
+	defer span.Finish()
+	// fmt.Println(span)
+
 	b.Tokens = 0
+
+	span.AddLog(&sg.KV{"TakeAll capacity", strconv.FormatInt(int64(b.Capacity), 10)})
 	return b.Capacity
 }
 
 func (t *TaskQueue) Loop(ctx context.Context) {
-	go func() {
+	go func(c context.Context) {
+		span, _ := sg.FromContext(ctx, "loop")
+		defer span.Finish()
+		fmt.Println(span)
+
 		for {
 			select {
 			case <-t.Bucket.Notify:
@@ -91,29 +113,43 @@ func (t *TaskQueue) Loop(ctx context.Context) {
 				// 	t.Bucket.Delay <- true // if pool not ready, make delay
 				// }
 
-				tokens := t.Bucket.TakeAll()
-				t.Sync(ctx, tokens)
+				tokens := t.Bucket.TakeAll(sg.NewTracedContext(c, span))
+				t.Sync(sg.NewTracedContext(c, span), tokens)
 			case <-ctx.Done():
 				log.Print(ctx.Err())
 				return
 			}
 		}
-	}()
+	}(ctx)
 }
 
 func (t *TaskQueue) StartQueue(ctx context.Context) {
-	t.Bucket.Start(ctx)
-	t.Loop(ctx)
+	span, _ := sg.FromContext(ctx, "StartQueue")
+	defer span.Finish()
+	// fmt.Println(span)
+
+	t.Bucket.Start(sg.NewTracedContext(ctx, span))
+	t.Loop(sg.NewTracedContext(ctx, span))
 }
 
 func (t *TaskQueue) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
+	span, _ := sg.FromContext(ctx, "PutTasks")
+	defer span.Finish()
+	fmt.Println("SERIALIZE ", span.Serialize())
+	// fmt.Println(span)
+
 	// t.Bucket.Reset <- true
-	return t.Queue.PutTasks(ctx, req)
+	return t.Queue.PutTasks(sg.NewTracedContext(ctx, span), req)
 }
 
 func (t *TaskQueue) Sync(ctx context.Context, tokens int64) bool {
-	tasks, err := t.Queue.TakeTasks(ctx, t.Name, t.Namespace, tokens)
+	span, _ := sg.FromContext(ctx, "Sync")
+	defer span.Finish()
+	// fmt.Println(span)
+
+	tasks, err := t.Queue.TakeTasks(sg.NewTracedContext(ctx, span), t.Name, t.Namespace, tokens)
 	if err != nil {
+		span.AddLog(&sg.KV{"TakeTasks error", err.Error()})
 		log.Println(err)
 		return false
 	}

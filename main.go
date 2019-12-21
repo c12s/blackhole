@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/c12s/blackhole/model"
 	"github.com/c12s/blackhole/service"
@@ -22,8 +21,5 @@ func main() {
 		fmt.Println(dbErr)
 		return
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	service.Run(ctx, db, conf.Address, conf.Celestial, conf.Apollo, conf.Opts)
-	cancel()
+	service.Run(db, conf)
 }
