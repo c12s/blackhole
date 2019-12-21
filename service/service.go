@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -45,6 +46,29 @@ func (s *Server) getTK(ctx context.Context, req *pb.PutReq) (*queue.TaskQueue, e
 	return tk, nil
 }
 
+func (s *Server) extractRBACData(req *pb.PutReq) map[string]string {
+	data := map[string]string{
+		"intent":         "mutate",
+		"kind":           strings.ToLower(pb.TaskKind_name[int32(req.Kind)]),
+		"service":        "blackhole",
+		"userid":         req.UserId,
+		"namespace":      req.Mtdata.Namespace,
+		"forceNamespace": strconv.FormatBool(req.Mtdata.ForceNamespaceQueue),
+		"queue":          req.Mtdata.Queue,
+	}
+
+	temp := map[string][]string{}
+	for _, t := range req.Tasks {
+		temp[t.RegionId] = append(temp[t.RegionId], t.ClusterId)
+	}
+
+	for k, v := range temp {
+		data[k] = strings.Join(v, ",")
+	}
+
+	return data
+}
+
 func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 	span, _ := sg.FromGRPCContext(ctx, "blackhole.put")
 	defer span.Finish()
@@ -53,11 +77,7 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 
 	client := NewApolloClient(s.Apollo)
 	resp, err := client.Auth(sg.NewTracedGRPCContext(ctx, span), &aPb.AuthOpt{
-		Data: map[string]string{
-			"intent": "put",
-			"kind":   "blackhole", // TODO: GET KIND: configs, secrets, ...
-			//TODO: ADD DATA!
-		},
+		Data: s.extractRBACData(req),
 	})
 	if err != nil {
 		span.AddLog(&sg.KV{"apollo resp error", err.Error()})

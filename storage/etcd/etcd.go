@@ -89,7 +89,9 @@ func (s *StorageEtcd) PutTasks(ctx context.Context, req *bPb.PutReq) (*bPb.Resp,
 	} else {
 		s.put(sg.NewTracedContext(ctx, span), req, 0, nil)
 	}
-	return &bPb.Resp{Msg: "Task accepted"}, nil
+
+	tid := span.Serialize().Get("trace_id")[0]
+	return &bPb.Resp{Msg: fmt.Sprintf("Task accepted with traceid: %s", tid)}, nil
 }
 
 func (s *StorageEtcd) TakeTasks(ctx context.Context, name, namespace string, tokens int64) (map[string]*cPb.Task, error) {
