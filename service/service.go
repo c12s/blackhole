@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"github.com/c12s/blackhole/helper"
 	"github.com/c12s/blackhole/model"
 	"github.com/c12s/blackhole/queue"
 	storage "github.com/c12s/blackhole/storage"
@@ -46,7 +47,7 @@ func (s *Server) getTK(ctx context.Context, req *pb.PutReq) (*queue.TaskQueue, e
 	return tk, nil
 }
 
-func (s *Server) extractRBACData(req *pb.PutReq) map[string]string {
+func (s *Server) extractRBACData(req *pb.PutReq, token string) map[string]string {
 	data := map[string]string{
 		"intent":         "mutate",
 		"kind":           strings.ToLower(pb.TaskKind_name[int32(req.Kind)]),
@@ -55,6 +56,7 @@ func (s *Server) extractRBACData(req *pb.PutReq) map[string]string {
 		"namespace":      req.Mtdata.Namespace,
 		"forceNamespace": strconv.FormatBool(req.Mtdata.ForceNamespaceQueue),
 		"queue":          req.Mtdata.Queue,
+		"token":          token,
 	}
 
 	temp := map[string][]string{}
@@ -75,10 +77,21 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 	fmt.Println(span)
 	fmt.Println("SERIALIZE ", span.Serialize())
 
+	token, terr := helper.ExtractToken(ctx)
+	if terr != nil {
+		span.AddLog(&sg.KV{"token error", terr.Error()})
+	}
+
 	client := NewApolloClient(s.Apollo)
-	resp, err := client.Auth(sg.NewTracedGRPCContext(ctx, span), &aPb.AuthOpt{
-		Data: s.extractRBACData(req),
-	})
+	resp, err := client.Auth(
+		helper.AppendToken(
+			sg.NewTracedGRPCContext(ctx, span),
+			token,
+		),
+		&aPb.AuthOpt{
+			Data: map[string]string{"intent": "auth"},
+		},
+	)
 	if err != nil {
 		span.AddLog(&sg.KV{"apollo resp error", err.Error()})
 		return &pb.Resp{Msg: err.Error()}, nil

@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"fmt"
+	"github.com/c12s/blackhole/helper"
 	"github.com/c12s/blackhole/model"
 	bPb "github.com/c12s/scheme/blackhole"
 	cPb "github.com/c12s/scheme/core"
@@ -34,6 +35,12 @@ func (s *StorageEtcd) put(ctx context.Context, req *bPb.PutReq, num int, task *b
 	fmt.Println(span)
 	fmt.Println("SERIALIZE ", span.Serialize())
 
+	token, terr := helper.ExtractToken(ctx)
+	if terr != nil {
+		span.AddLog(&sg.KV{"token error", terr.Error()})
+		return
+	}
+
 	ssp := span.Serialize()
 	qt := &cPb.Task{
 		UserId:    req.UserId,
@@ -47,6 +54,7 @@ func (s *StorageEtcd) put(ctx context.Context, req *bPb.PutReq, num int, task *b
 			ParrentSpanId: ssp.Get("parrent_span_id")[0],
 			Baggage:       parse(ssp.Get("tags")[0]),
 		},
+		Token: token,
 	}
 
 	if task != nil {

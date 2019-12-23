@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"github.com/c12s/blackhole/helper"
 	cPb "github.com/c12s/scheme/celestial"
 	pb "github.com/c12s/scheme/core"
 	sg "github.com/c12s/stellar-go"
@@ -34,7 +35,13 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 
 			mt := &cPb.MutateReq{Mutate: task}
 			client := NewCelestialClient(celestial)
-			_, err := client.Mutate(sg.NewTracedGRPCContext(nil, span), mt)
+			_, err := client.Mutate(
+				helper.AppendToken(
+					sg.NewTracedGRPCContext(nil, span),
+					task.Token,
+				),
+				mt,
+			)
 			if err != nil {
 				log.Println(err)
 			}
