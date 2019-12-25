@@ -111,7 +111,13 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 		return nil, err
 	}
 
-	pResp, err := tk.PutTasks(sg.NewTracedContext(ctx, span), req)
+	pResp, err := tk.PutTasks(
+		helper.AppendToken(
+			sg.NewTracedContext(ctx, span),
+			token,
+		),
+		req,
+	)
 	if err != nil {
 		span.AddLog(&sg.KV{"blackhole.Put PutTasks error", err.Error()})
 		log.Println(err)

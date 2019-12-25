@@ -7,7 +7,7 @@ import (
 )
 
 func AppendToken(ctx context.Context, token string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, "token", token)
+	return metadata.AppendToOutgoingContext(ctx, "c12stoken", token)
 }
 
 func ExtractToken(ctx context.Context) (string, error) {
@@ -16,9 +16,9 @@ func ExtractToken(ctx context.Context) (string, error) {
 		return "", errors.New("No token in the request")
 	}
 
-	if _, ok := md["token"]; !ok {
+	if _, ok := md["c12stoken"]; !ok {
 		return "", errors.New("No token in the request")
 	}
 
-	return md["token"][0], nil
+	return md["c12stoken"][0], nil
 }

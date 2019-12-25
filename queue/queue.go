@@ -135,8 +135,6 @@ func (t *TaskQueue) StartQueue(ctx context.Context) {
 func (t *TaskQueue) PutTasks(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 	span, _ := sg.FromContext(ctx, "PutTasks")
 	defer span.Finish()
-	fmt.Println("SERIALIZE ", span.Serialize())
-	// fmt.Println(span)
 
 	// t.Bucket.Reset <- true
 	return t.Queue.PutTasks(sg.NewTracedContext(ctx, span), req)
@@ -147,7 +145,10 @@ func (t *TaskQueue) Sync(ctx context.Context, tokens int64) bool {
 	defer span.Finish()
 	// fmt.Println(span)
 
-	tasks, err := t.Queue.TakeTasks(sg.NewTracedContext(ctx, span), t.Name, t.Namespace, tokens)
+	tasks, err := t.Queue.TakeTasks(
+		sg.NewTracedContext(ctx, span),
+		t.Name, t.Namespace, tokens,
+	)
 	if err != nil {
 		span.AddLog(&sg.KV{"TakeTasks error", err.Error()})
 		log.Println(err)
