@@ -149,7 +149,7 @@ func Run(db storage.DB, conf *model.BlackHoleConfig) {
 
 	server := grpc.NewServer()
 	blackholeServer := &Server{
-		Queue:      queue.New(sg.NewTracedContext(ctx, span), db, conf.Opts, conf.Celestial),
+		Queue:      queue.New(sg.NewTracedContext(ctx, span), db, conf.Opts, conf.Celestial, conf.Apollo),
 		Apollo:     conf.Apollo,
 		instrument: conf.InstrumentConf,
 	}
