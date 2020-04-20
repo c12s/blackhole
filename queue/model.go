@@ -56,6 +56,8 @@ func (bh *BlackHole) GetTK(ctx context.Context, name string) (*TaskQueue, error)
 	defer span.Finish()
 	fmt.Println(span)
 
+	fmt.Println("QUEUE NAME :", name)
+
 	if tk, ok := bh.Queues[name]; ok {
 		return tk, nil
 	}

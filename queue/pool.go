@@ -30,9 +30,11 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 				task.SpanContext.Baggage,
 				"worker.pulltasks",
 			)
-			fmt.Println(span)
-			fmt.Println("SERIALIZE ", span.Serialize())
+			// fmt.Println(span)
+			// fmt.Println("SERIALIZE ", span.Serialize())
 			active <- wid // signal that worker is taken the job
+
+			fmt.Println("WORKER TASK: ", task)
 
 			mt := &cPb.MutateReq{Mutate: task}
 			switch mt.Mutate.Kind {

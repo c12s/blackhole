@@ -32,6 +32,7 @@ func (s *Server) getTK(ctx context.Context, req *pb.PutReq) (*queue.TaskQueue, e
 	fmt.Println(span)
 
 	if req.Mtdata.ForceNamespaceQueue {
+		fmt.Println("FORCED")
 		tk, err := s.Queue.GetTK(sg.NewTracedGRPCContext(ctx, span), req.Mtdata.Namespace)
 		if err != nil {
 			span.AddLog(&sg.KV{"Queue GetTK ForceNamespace error", err.Error()})
@@ -40,6 +41,11 @@ func (s *Server) getTK(ctx context.Context, req *pb.PutReq) (*queue.TaskQueue, e
 		return tk, nil
 	}
 	tk, err := s.Queue.GetTK(sg.NewTracedGRPCContext(ctx, span), req.Mtdata.Queue)
+	fmt.Println()
+	fmt.Println("TO QUEUE")
+	fmt.Println(tk.Namespace, tk.Queue)
+	fmt.Println(tk)
+	fmt.Println()
 	if err != nil {
 		span.AddLog(&sg.KV{"Queue GetTK error", err.Error()})
 		return nil, err
@@ -76,6 +82,8 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 	defer span.Finish()
 	fmt.Println(span)
 	fmt.Println("SERIALIZE ", span.Serialize())
+
+	fmt.Println("STIGLO: ", req)
 
 	token, terr := helper.ExtractToken(ctx)
 	if terr != nil {
