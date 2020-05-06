@@ -11,7 +11,7 @@ import (
 	"log"
 )
 
-func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int, celestial, apollo string) {
+func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int, celestial, apollo, meridian string) {
 	span, _ := sg.FromContext(ctx, "newWorker")
 	defer span.Finish()
 	// fmt.Println(span)
@@ -49,8 +49,23 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 				)
 				if err != nil {
 					log.Println(err)
+					return
 				}
 				fmt.Println("Otisao zahtev u apollo")
+			case bPb.TaskKind_NAMESPACES:
+				client := NewMeridianClient(meridian)
+				_, err := client.Mutate(
+					helper.AppendToken(
+						sg.NewTracedGRPCContext(nil, span),
+						task.Token,
+					),
+					mt,
+				)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				fmt.Println("Otisao zahtev u merdian")
 			default:
 				client := NewCelestialClient(celestial)
 				_, err := client.Mutate(
@@ -62,6 +77,7 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 				)
 				if err != nil {
 					log.Println(err)
+					return
 				}
 				fmt.Println("Otisao zahtev u celestial")
 			}
@@ -86,7 +102,7 @@ func (wp *WorkerPool) init(ctx context.Context) {
 	// fmt.Println(span)
 
 	for i := 0; i < wp.MaxWorkers; i++ {
-		go wp.newWorker(sg.NewTracedContext(ctx, span), wp.Pipe, wp.done, wp.active, i, wp.Celestial, wp.Apollo)
+		go wp.newWorker(sg.NewTracedContext(ctx, span), wp.Pipe, wp.done, wp.active, i, wp.Celestial, wp.Apollo, wp.Meridian)
 	}
 	go func() {
 		for {

@@ -6,7 +6,6 @@ import (
 	"github.com/c12s/blackhole/model"
 	"github.com/c12s/blackhole/queue"
 	storage "github.com/c12s/blackhole/storage"
-	aPb "github.com/c12s/scheme/apollo"
 	pb "github.com/c12s/scheme/blackhole"
 	sg "github.com/c12s/stellar-go"
 	"golang.org/x/net/context"
@@ -21,6 +20,7 @@ import (
 type Server struct {
 	Queue      *queue.BlackHole
 	Apollo     string
+	Meridian   string
 	instrument map[string]string
 }
 
@@ -85,32 +85,22 @@ func (s *Server) Put(ctx context.Context, req *pb.PutReq) (*pb.Resp, error) {
 
 	fmt.Println("STIGLO: ", req)
 
-	token, terr := helper.ExtractToken(ctx)
-	if terr != nil {
-		span.AddLog(&sg.KV{"token error", terr.Error()})
-	}
-
-	client := NewApolloClient(s.Apollo)
-	resp, err := client.Auth(
-		helper.AppendToken(
-			sg.NewTracedGRPCContext(ctx, span),
-			token,
-		),
-		&aPb.AuthOpt{
-			Data: map[string]string{"intent": "auth"},
-		},
-	)
+	token, err := helper.ExtractToken(ctx)
 	if err != nil {
-		span.AddLog(&sg.KV{"apollo resp error", err.Error()})
-		return &pb.Resp{Msg: err.Error()}, nil
+		span.AddLog(&sg.KV{"token error", err.Error()})
+		return nil, err
 	}
 
-	if !resp.Value {
-		span.AddLog(
-			&sg.KV{"apollo.auth value", strconv.FormatBool(resp.Value)},
-			&sg.KV{"apollo.auth message", resp.Data["message"]},
-		)
-		return &pb.Resp{Msg: resp.Data["message"]}, nil
+	err = s.auth(ctx, mutateOpt(req, token))
+	if err != nil {
+		span.AddLog(&sg.KV{"auth error", err.Error()})
+		return nil, err
+	}
+
+	_, err = s.checkNS(ctx, req.UserId, req.Mtdata.Namespace)
+	if err != nil {
+		span.AddLog(&sg.KV{"check ns error", err.Error()})
+		return nil, err
 	}
 
 	tk, err := s.getTK(sg.NewTracedGRPCContext(ctx, span), req)
@@ -157,8 +147,9 @@ func Run(db storage.DB, conf *model.BlackHoleConfig) {
 
 	server := grpc.NewServer()
 	blackholeServer := &Server{
-		Queue:      queue.New(sg.NewTracedContext(ctx, span), db, conf.Opts, conf.Celestial, conf.Apollo),
+		Queue:      queue.New(sg.NewTracedContext(ctx, span), db, conf.Opts, conf.Celestial, conf.Apollo, conf.Meridian),
 		Apollo:     conf.Apollo,
+		Meridian:   conf.Meridian,
 		instrument: conf.InstrumentConf,
 	}
 
