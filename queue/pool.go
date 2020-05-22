@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/c12s/blackhole/helper"
+	bPb "github.com/c12s/scheme/blackhole"
 	cPb "github.com/c12s/scheme/celestial"
 	pb "github.com/c12s/scheme/core"
 	sg "github.com/c12s/stellar-go"
 	"log"
 )
 
-func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int, celestial string) {
+func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, active chan string, id int, celestial, apollo, meridian string) {
 	span, _ := sg.FromContext(ctx, "newWorker")
 	defer span.Finish()
 	// fmt.Println(span)
@@ -29,23 +30,57 @@ func (wp *WorkerPool) newWorker(ctx context.Context, jobs chan *pb.Task, done, a
 				task.SpanContext.Baggage,
 				"worker.pulltasks",
 			)
-			fmt.Println(span)
-			fmt.Println("SERIALIZE ", span.Serialize())
+			// fmt.Println(span)
+			// fmt.Println("SERIALIZE ", span.Serialize())
 			active <- wid // signal that worker is taken the job
 
+			fmt.Println("WORKER TASK: ", task)
+
 			mt := &cPb.MutateReq{Mutate: task}
-			client := NewCelestialClient(celestial)
-			_, err := client.Mutate(
-				helper.AppendToken(
-					sg.NewTracedGRPCContext(nil, span),
-					task.Token,
-				),
-				mt,
-			)
-			if err != nil {
-				log.Println(err)
+			switch mt.Mutate.Kind {
+			case bPb.TaskKind_ROLES:
+				client := NewApolloClient(apollo)
+				_, err := client.Mutate(
+					helper.AppendToken(
+						sg.NewTracedGRPCContext(nil, span),
+						task.Token,
+					),
+					mt,
+				)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				fmt.Println("Otisao zahtev u apollo")
+			case bPb.TaskKind_NAMESPACES:
+				client := NewMeridianClient(meridian)
+				_, err := client.Mutate(
+					helper.AppendToken(
+						sg.NewTracedGRPCContext(nil, span),
+						task.Token,
+					),
+					mt,
+				)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				fmt.Println("Otisao zahtev u merdian")
+			default:
+				client := NewCelestialClient(celestial)
+				_, err := client.Mutate(
+					helper.AppendToken(
+						sg.NewTracedGRPCContext(nil, span),
+						task.Token,
+					),
+					mt,
+				)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				fmt.Println("Otisao zahtev u celestial")
 			}
-			fmt.Println("Otisao zahtev u celestial")
 
 			done <- wid // signal that worker is free
 			span.Finish()
@@ -67,7 +102,7 @@ func (wp *WorkerPool) init(ctx context.Context) {
 	// fmt.Println(span)
 
 	for i := 0; i < wp.MaxWorkers; i++ {
-		go wp.newWorker(sg.NewTracedContext(ctx, span), wp.Pipe, wp.done, wp.active, i, wp.Celestial)
+		go wp.newWorker(sg.NewTracedContext(ctx, span), wp.Pipe, wp.done, wp.active, i, wp.Celestial, wp.Apollo, wp.Meridian)
 	}
 	go func() {
 		for {

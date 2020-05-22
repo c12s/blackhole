@@ -16,6 +16,7 @@ type BlackHole struct {
 	Address        string            `yaml:"address"`
 	Celestial      string            `yaml:"celestial"`
 	Apollo         string            `yaml:"apollo"`
+	Meridian       string            `yaml:"meridian"`
 	DB             []string          `yaml:"db"`
 	Queues         map[string]Queue  `yaml:"queue"`
 	InstrumentConf map[string]string `yaml:"instrument"`
@@ -45,6 +46,7 @@ type BlackHoleConfig struct {
 	Address        string
 	Celestial      string
 	Apollo         string
+	Meridian       string
 	DB             []string
 	Opts           []*TaskOption
 	InstrumentConf map[string]string
@@ -131,6 +133,7 @@ func configToOption(bcf *Config) *BlackHoleConfig {
 		Address:        bcf.Content.Address,
 		Celestial:      bcf.Content.Celestial,
 		Apollo:         bcf.Content.Apollo,
+		Meridian:       bcf.Content.Meridian,
 		DB:             bcf.Content.DB,
 		Opts:           opts,
 		InstrumentConf: bcf.Content.InstrumentConf,

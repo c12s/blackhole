@@ -73,15 +73,18 @@ func (s *StorageEtcd) put(ctx context.Context, req *bPb.PutReq, num int, task *b
 	} else if req.Mtdata.ForceNamespaceQueue {
 		key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Namespace, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
 	} else {
+		fmt.Println("DESIO SE ELSE")
 		key = TaskKey(req.Mtdata.Namespace, req.Mtdata.Queue, req.Mtdata.TaskName, req.Mtdata.Timestamp, num)
 	}
 
 	child := span.Child("etcd task put")
 	_, err = s.Kv.Put(ctx, key, string(data))
 	if err != nil {
+		fmt.Println("ERRORCINA ", err)
 		child.AddLog(&sg.KV{"etcd task put error", err.Error()})
 		fmt.Println(err) //TODO: this should go to some log system!!
 	}
+	fmt.Println("KLJUC: ", key)
 	child.Finish()
 }
 
@@ -91,10 +94,12 @@ func (s *StorageEtcd) PutTasks(ctx context.Context, req *bPb.PutReq) (*bPb.Resp,
 	fmt.Println(span)
 
 	if len(req.Tasks) > 0 {
+		fmt.Println("DESIo SE IF")
 		for num, task := range req.Tasks {
 			s.put(sg.NewTracedContext(ctx, span), req, num, task)
 		}
 	} else {
+		fmt.Println("DESIO SE ELSE")
 		s.put(sg.NewTracedContext(ctx, span), req, 0, nil)
 	}
 

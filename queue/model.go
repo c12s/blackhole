@@ -44,6 +44,8 @@ type WorkerPool struct {
 	active        chan string
 	Workers       map[string]*Worker
 	Celestial     string
+	Apollo        string
+	Meridian      string
 }
 
 type BlackHole struct {
@@ -55,6 +57,8 @@ func (bh *BlackHole) GetTK(ctx context.Context, name string) (*TaskQueue, error)
 	defer span.Finish()
 	fmt.Println(span)
 
+	fmt.Println("QUEUE NAME :", name)
+
 	if tk, ok := bh.Queues[name]; ok {
 		return tk, nil
 	}
@@ -63,7 +67,7 @@ func (bh *BlackHole) GetTK(ctx context.Context, name string) (*TaskQueue, error)
 	return nil, errors.New("Queue does not exists!")
 }
 
-func newPool(ctx context.Context, maxqueued, maxworkers int, celestial string) *WorkerPool {
+func newPool(ctx context.Context, maxqueued, maxworkers int, celestial, apollo, meridian string) *WorkerPool {
 	span, _ := sg.FromContext(ctx, "newPool")
 	defer span.Finish()
 	fmt.Println(span)
@@ -77,6 +81,8 @@ func newPool(ctx context.Context, maxqueued, maxworkers int, celestial string) *
 		active:        make(chan string),
 		Workers:       map[string]*Worker{},
 		Celestial:     celestial,
+		Apollo:        apollo,
+		Meridian:      meridian,
 	}
 	wp.init(sg.NewTracedContext(ctx, span))
 	return wp
@@ -113,7 +119,7 @@ func newBucket(ctx context.Context, capacity, tokens int64, interval *model.Fill
 	}
 }
 
-func New(ctx context.Context, db storage.DB, options []*model.TaskOption, celestial string) *BlackHole {
+func New(ctx context.Context, db storage.DB, options []*model.TaskOption, celestial, apollo, meridian string) *BlackHole {
 	span, _ := sg.FromContext(ctx, "queue.New")
 	defer span.Finish()
 	fmt.Println(span)
@@ -121,7 +127,7 @@ func New(ctx context.Context, db storage.DB, options []*model.TaskOption, celest
 	q := map[string]*TaskQueue{}
 	for _, opt := range options {
 		tb := newBucket(sg.NewTracedContext(ctx, span), opt.Capacity, opt.Tokens, opt.FillRate, opt.TRetry)
-		wp := newPool(sg.NewTracedContext(ctx, span), opt.MaxQueued, opt.MaxWorkers, celestial)
+		wp := newPool(sg.NewTracedContext(ctx, span), opt.MaxQueued, opt.MaxWorkers, celestial, apollo, meridian)
 		tq := newQueue(sg.NewTracedContext(ctx, span), opt.Namespace, opt.Name, tb, wp, db)
 
 		// Add queue to the database
