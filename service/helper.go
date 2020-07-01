@@ -80,6 +80,8 @@ func mutateKind(kind bPb.TaskKind) string {
 		return "namespaces"
 	case bPb.TaskKind_ROLES:
 		return "roles"
+	case bPb.TaskKind_TOPOLOGY:
+		return "topology"
 	}
 	return ""
 }
