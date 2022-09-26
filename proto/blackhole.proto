@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package C12S.Blackhole;
+
+option go_package = "./blackhole";
+
+service Blackhole {
+
+    //
+    // Endpoint for sending a task to a given queue
+    // Operation (inserting the task in queue) is synchronous, while
+    // execution of the task itself is async
+    //
+    rpc AddTask(Task) returns (Task);
+
+    //
+    // Endpoint for getting information about Task based on it's id
+    // Operation is synchronous
+    //
+    rpc GetTask(TaskId) returns (Task);
+
+    //
+    // Endpoint for deleting a task. This can be done only if
+    // execution of the task hasn't begun yet.
+    // Meant to be used to clean tasks if queue gets overfilled
+    // Operation is synchronous
+    //
+    rpc DeleteTask(TaskId) returns (Task);
+
+    //
+    // Endpoint for creating new task queue
+    // Operation is synchronous
+    //
+    rpc CreateTaskQueue(TaskQueue) returns (TaskQueue);
+}
+
+message TaskId{
+    string id = 1;
+}
+
+message WorkerDestination{
+    string url = 1;
+    string method = 2;
+}
+
+message Task {
+    enum State {
+        RECEIVED = 0;
+        PROCESSING = 1;
+        RETRY_TIMEOUT = 2;
+        FINISHED = 3;
+        FAILED = 4;
+        DELETED = 5;
+    }
+
+    string id = 1;
+    string name = 2;
+    string queue_id = 3;
+    WorkerDestination worker_destination = 4;
+    string payload = 5;
+    int32 max_retries = 6;
+    // Next two fields are in milliseconds
+    int32 retry_delay = 7;
+    int32 timeout = 8;
+    State state = 9;
+}
+
+message TaskQueue {
+    string id = 1;
+    string name = 2;
+    int32 bucket_size = 3;
+    // In milliseconds
+    int32 refresh_rate = 4;
+}

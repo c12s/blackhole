@@ -1,0 +1,55 @@
+version: "3.7"
+services:
+
+  queue:
+    build: 
+      context: ./
+      dockerfile: Dockerfile
+      args:
+        - GRPC_PORT=${BLACKHOLE_GRPC_PORT}
+    image: blackhole
+    container_name: blackhole
+    restart: always
+    networks:
+      - c12s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - ${BLACKHOLE_GRPC_PORT}:${BLACKHOLE_GRPC_PORT}
+    environment:
+      GRPC_PORT: ${BLACKHOLE_GRPC_PORT}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+    depends_on: 
+      - database
+      - dummy_service
+
+  database:
+    image: postgres:14.5
+    networks:
+      - c12s
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+
+  adminer:
+    image: adminer
+    restart: always
+    networks:
+      - c12s
+    ports:
+      - 8000:8080
+
+volumes:
+  db-data:
+    driver: local
+
+networks:
+  c12s:
+    driver: bridge
