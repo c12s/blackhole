@@ -16,6 +16,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
 
@@ -72,6 +73,7 @@ func Serve(db *gorm.DB) {
 	}
 	server := grpc.NewServer()
 	pb.RegisterBlackholeServer(server, &grpc_server{db: db, queueManager: *in_mem_queue_manager})
+	reflection.Register(server)
 	if err := server.Serve(listener); err != nil {
 		log.Fatalf("Failed to start grpc server: %v", err)
 	} else {
